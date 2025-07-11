@@ -54,8 +54,28 @@ app.all('/player/growid/login/validate', (req, res) => {
     );
 });
 
-app.all('/player/*', function (req, res) {
-    res.status(301).redirect('https://api.yoruakio.tech/player/' + req.path.slice(8));
+app.all('/player/growid/checkToken', (req, res) => {
+    try {
+        const { refreshToken, clientData } = req.body;
+
+        if (!refreshToken || !clientData) {
+            return res.status(400).send({ status: "error", message: "Missing refreshToken or clientData" });
+        }
+
+        let decodeRefreshToken = Buffer.from(refreshToken, 'base64').toString('utf-8');
+
+        const token = Buffer.from(decodeRefreshToken.replace(/(_token=)[^&]*/, `$1${Buffer.from(clientData).toString('base64')}`)).toString('base64');
+
+        res.send({
+            status: "success",
+            message: "Token is valid.",
+            token: token,
+            url: "",
+            accountType: "growtopia"
+        });
+    } catch (error) {
+        res.status(500).send({ status: "error", message: "Internal Server Error" });
+    }
 });
 
 app.get('/', function (req, res) {
