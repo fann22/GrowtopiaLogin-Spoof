@@ -3,6 +3,7 @@ const app = express();
 const bodyParser = require('body-parser');
 const rateLimiter = require('express-rate-limit');
 const compression = require('compression');
+const rawBody = require('raw-body');
 
 app.use(compression({
     level: 5,
