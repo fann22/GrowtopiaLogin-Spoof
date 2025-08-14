@@ -42,7 +42,7 @@ app.use(async (req, res) => {
     console.log('Body:', bodyString);
 
     // Forward ke server asli
-    const targetUrl = `https://login.growtopia.com${req.originalUrl}`;
+    const targetUrl = `https://login.growtopiagame.com${req.originalUrl}`;
     const response = await fetch(targetUrl, {
       method: req.method,
       headers: {
